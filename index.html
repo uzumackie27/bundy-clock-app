@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BundyClock Pro Mobile</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#003366">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <style>
+        :root { 
+            --blue: #003366; 
+            --yellow: #FFD700; 
+            --light: #f4f7f6; 
+            --white: #ffffff;
+            --red: #ff4d4d; 
+            --green: #2ecc71; 
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--light); 
+            margin: 0; 
+            padding-bottom: 70px; /* Space for bottom nav */
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Mobile Bottom Navigation */
+        nav { 
+            background: var(--blue); 
+            display: flex; 
+            justify-content: space-around; 
+            padding: 10px 0; 
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        nav button { 
+            background: transparent; 
+            border: none;
+            color: rgba(255,255,255,0.6); 
+            padding: 8px; 
+            font-size: 10px;
+            font-weight: bold; 
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        nav button.active { color: var(--yellow); }
+        
+        /* Main Container */
+        .container { padding: 15px; max-width: 600px; margin: 0 auto; }
+        
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Clock Area */
+        #digital-clock { 
+            font-size: 3.5rem; 
+            font-weight: 800; 
+            color: var(--blue); 
+            text-align: center; 
+            margin: 20px 0;
+            letter-spacing: -2px;
+        }
+
+        #scan-display { 
+            background: var(--white); 
+            text-align: center; 
+            border-radius: 20px; 
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border: 2px solid #eee;
+        }
+
+        /* Scan Result Card */
+        .scan-card img { 
+            width: 140px; 
+            height: 140px; 
+            border-radius: 50%; 
+            border: 4px solid var(--yellow);
+            object-fit: cover;
+            margin-bottom: 15px;
+        }
+
+        /* Mobile Inputs */
+        input, select { 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 12px; 
+            width: 100%; 
+            font-size: 16px; /* Prevents iOS auto-zoom */
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        .btn-main { 
+            background: var(--blue); 
+            color: #fff; 
+            border: none; 
+            padding: 16px; 
+            width: 100%; 
+            border-radius: 12px;
+            font-weight: bold; 
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .btn-main:active { transform: scale(0.97); }
+
+        .section-header { color: var(--blue); font-size: 1.4rem; margin-top: 0; }
+
+        /* Table Responsiveness */
+        .table-container { overflow-x: auto; background: white; border-radius: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+
+        @media print { nav { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body onload="startTime()">
+
+<div class="container">
+    <div id="clock" class="tab-content active">
+        <div id="digital-clock">00:00:00</div>
+        
+        <div id="scan-display">
+            <div id="scan-init-msg">
+                <p style="font-size: 1.2rem; color: #888;">Tap below to scan</p>
+            </div>
+            
+            <div id="scan-result-card" class="scan-card" style="display: none;">
+                <img id="scan-photo-view" src="" alt="Profile">
+                <h2 id="scan-name-view" style="margin:0; color:var(--blue);"></h2>
+                <p id="scan-id-view" style="color:#666; margin: 5px 0;"></p>
+                <div id="scan-status-view" style="background:var(--green); color:white; padding:8px 15px; border-radius:20px; display:inline-block; margin-top:10px; font-weight:bold;"></div>
+            </div>
+        </div>
+
+        <input type="text" id="barcode-input" placeholder="TAP TO SCAN / ENTER ID" style="margin-top: 20px; text-align: center;">
+    </div>
+
+    <div id="reg" class="tab-content">
+        <h2 class="section-header">Employee Registry</h2>
+        <input type="text" id="reg-name" placeholder="Full Name">
+        <input type="text" id="reg-barcode" placeholder="Barcode ID">
+        <select id="reg-dept-select"></select>
+        <input type="file" id="reg-photo" accept="image/*" onchange="previewImage(this)">
+        <button class="btn-main" id="save-emp-btn" onclick="registerEmployee()">SAVE EMPLOYEE</button>
+        
+        <div class="table-container" style="margin-top: 20px;">
+            <table id="employee-table">
+                <tbody id="employee-list-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="report" class="tab-content">
+        <h2 class="section-header">DTR Report</h2>
+        <input type="date" id="start-date">
+        <input type="date" id="end-date">
+        <select id="filter-employee"></select>
+        <button onclick="generateReport('single')" class="btn-main">Generate Card</button>
+        <div id="report-render-area" style="margin-top:20px;"></div>
+    </div>
+</div>
+
+<nav class="no-print">
+    <button onclick="showTab('clock')" id="nav-clock" class="active">🕒<span>CLOCK</span></button>
+    <button onclick="verifyAdmin('reg')" id="nav-reg">👥<span>STAFF</span></button>
+    <button onclick="verifyAdmin('report')" id="nav-report">📄<span>REPORT</span></button>
+    <button onclick="logoutAdmin()" style="color:var(--red)">✕<span>LOGOUT</span></button>
+</nav>
+
+<script>
+    // Logic remains similar to your V8, but optimized for Mobile UI interaction
+    let employees = JSON.parse(localStorage.getItem('employees')) || [];
+    let logs = JSON.parse(localStorage.getItem('logs')) || [];
+    let departments = ["General", "Admin", "IT", "Sales"];
+    let isAdminAuthenticated = false;
+    let scanTimeout;
+
+    function startTime() {
+        const now = new Date();
+        document.getElementById('digital-clock').innerHTML = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+        setTimeout(startTime, 1000);
+    }
+
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.getElementById('nav-' + tabId).classList.add('active');
+    }
+
+    function verifyAdmin(tabId) {
+        if (isAdminAuthenticated) { 
+            showTab(tabId); 
+            updateEmployeeList();
+            updateDropdowns();
+        } else {
+            const pass = prompt("Admin Password:");
+            if (pass === "admin@123") { 
+                isAdminAuthenticated = true; 
+                verifyAdmin(tabId); 
+            }
+        }
+    }
+
+    function handlePunch(barcode) {
+        const emp = employees.find(e => e.barcode === barcode);
+        if(!emp) {
+            alert("Unknown ID");
+            return;
+        }
+
+        const d = new Date().toISOString().split('T')[0];
+        const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        let log = logs.find(l => l.barcode === barcode && l.date === d);
+        let status = "";
+
+        if(!log) {
+            log = { barcode, date: d, in: t };
+            logs.push(log);
+            status = "CLOCKED IN";
+        } else if(!log.out) {
+            log.out = t;
+            status = "CLOCKED OUT";
+        } else {
+            status = "ALREADY DONE";
+        }
+
+        localStorage.setItem('logs', JSON.stringify(logs));
+
+        // Mobile Feedback
+        document.getElementById('scan-init-msg').style.display = "none";
+        const card = document.getElementById('scan-result-card');
+        card.style.display = "block";
+        document.getElementById('scan-photo-view').src = emp.photo || '';
+        document.getElementById('scan-name-view').innerText = emp.name;
+        document.getElementById('scan-status-view').innerText = status + " " + t;
+
+        if (navigator.vibrate) navigator.vibrate(200); // Vibrate on success
+
+        setTimeout(() => {
+            card.style.display = "none";
+            document.getElementById('scan-init-msg').style.display = "block";
+        }, 4000);
+    }
+
+    function updateDropdowns() {
+        const empOpts = employees.map(e => `<option value="${e.barcode}">${e.name}</option>`).join('');
+        document.getElementById('filter-employee').innerHTML = empOpts;
+        document.getElementById('reg-dept-select').innerHTML = departments.map(d => `<option value="${d}">${d}</option>`).join('');
+    }
+
+    function updateEmployeeList() {
+        document.getElementById('employee-list-body').innerHTML = employees.map(e => `
+            <tr>
+                <td><b>${e.name}</b><br><small>${e.barcode}</small></td>
+                <td><button onclick="deleteEmployee('${e.barcode}')" style="color:red; background:none; border:none;">Delete</button></td>
+            </tr>
+        `).join('');
+    }
+
+    function registerEmployee() {
+        const name = document.getElementById('reg-name').value;
+        const barcode = document.getElementById('reg-barcode').value;
+        if(!name || !barcode) return;
+        
+        employees.push({ name, barcode, dept: document.getElementById('reg-dept-select').value });
+        localStorage.setItem('employees', JSON.stringify(employees));
+        updateEmployeeList();
+        alert("Employee Saved");
+    }
+
+    function logoutAdmin() {
+        isAdminAuthenticated = false;
+        showTab('clock');
+    }
+
+    document.getElementById('barcode-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { 
+            handlePunch(e.target.value); 
+            e.target.value = ''; 
+            e.target.blur(); // Hide mobile keyboard
+        }
+    });
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+</script>
+</body>
+</html>
